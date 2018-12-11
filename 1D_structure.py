@@ -11,7 +11,7 @@ FILL_COLOR = "blue"
 BORDER_COLOR = "black"
 PEN_SIZE = 2
 # Protected
-_last_square_coord = 0, 0
+_last_line_bools = []
 
 # Window
 win = turtle.Screen()
@@ -63,25 +63,75 @@ class Square:
         self.filled = False
 
 
+def generate_init_line(number_squares_filled, patron=None):
+    if patron is not None:
+        return patron*(SQUARE_LINE_LENGTH//patron + 1)[0:SQUARE_LINE_LENGTH]  # Mejorable.
+    else:
+        return [1] * number_squares_filled + [0] * (SQUARE_LINE_LENGTH - number_squares_filled)
+
+
 class Line:
-    def __init__(self, number, rules=None, init_rule=lambda: random.randint(0, 1)):
+    def __init__(self, number, rules, use_init_rule=True, init_line=None,
+                 init_rule=lambda: random.randint(0, 1)):
         self.number = number
         self.rules = rules
+        self.use_init_rule = use_init_rule
         self.init_rule = init_rule
+        self.init_line = init_line
         self.bool = []
         self.draw()
 
     def draw(self):
         for n in range(SQUARE_LINE_LENGTH):
-            value = self.init_rule()
-            Square(self.number, n, value)
-            self.bool.append(value)
+            if self.number == 0:
+                if self.use_init_rule:
+                    value = self.init_rule()
+                else:
+                    if self.init_line is None:
+                        raise Exception("Init line does not exists.")
+                    if not isinstance(self.init_line, list):
+                        raise Exception("Init line must be a list.")
+                    if len(self.init_line) != SQUARE_LINE_LENGTH:
+                        raise Exception("Init line has a wrong length.")
+                    value = self.init_line[n]
+                Square(-self.number, n, value)
+                self.bool.append(value)
+            else:
+                global _last_line_bools
+                model = _last_line_bools
+                print(model)
+                count = 0
+                for rule in self.rules:
+                    if rule.values == model[n:len(rule.values)]:
+                        if len(rule.result) == 1:
+                            value = rule.result
+                            Square(-self.number, n, value)
+                            self.bool.append(value)
+                            break
+                        else:
+                            values = rule.result
+                            to_add = len(values)
+                            excent = to_add + n
+                            if excent > SQUARE_LINE_LENGTH:
+                                to_add = SQUARE_LINE_LENGTH - n
+                            for m in range(to_add):
+                                Square(-self.number, n+m, values[m])
+                                self.bool.append(values[m])
+                            n += to_add
+                            break
+                    else:
+                        count += 1
+                if count == len(self.rules):
+                    Square(-self.number, n, False)
+                    self.bool.append(False)
+        _last_line_bools = self.bool
 
 
 class Rule:
-    def __init__(self, values, result):
+    def __init__(self, values, result, number):
         self.values = values
         self.result = result
+        self.number = number
 
     def draw(self, x, y):
         p = turtle.Turtle()
@@ -90,33 +140,12 @@ class Rule:
         p.up()
         p.color = BORDER_COLOR
         p.pensize(PEN_SIZE)
-        p.goto((7 + x + INIT_X) * W, (6.75 - y + INIT_Y) * H)
-        p.write("1.", font=("Arial", 16, "normal"))
+        p.goto((7 + 6*x + INIT_X) * W, (6.75 - y + INIT_Y) * H)
+        p.write(str(self.number) + ".", font=("Arial", 16, "normal"))
         for n in range(len(self.values)):
-            Square(6 - y, 8 + n + x, self.values[n])
-        draw_arrow_for_rule()
+            Square(6 - 2*y, 8 + n + 6*x, self.values[n])
         for n in range(len(self.result)):
-            Square(6 - y, 10 + n + x + len(self.values), self.result[n])
-
-
-def draw_arrow_for_rule():
-    p = turtle.Turtle()
-    p.hideturtle()
-    p.speed(0)
-    p.up()
-    p.goto(*_last_square_coord)
-    p.left(20)
-    p.forward(W + 0.5*H)
-    p.down()
-    p.color = BORDER_COLOR
-    p.pensize(PEN_SIZE)
-    p.right(20)
-    p.forward(W)
-    p.left(140)
-    p.forward(0.3*W)
-    p.back(0.3*W)
-    p.right(280)
-    p.forward(0.3*W)
+            Square(5 - 2*y, 8 + n + 6*x, self.result[n])
 
 
 def draw_rules(rules):
@@ -130,17 +159,18 @@ def draw_rules(rules):
     p.write("Reglas:", font=("Arial", 14, "normal"))
     p.up()
     for i in range(len(rules)):
-        rules[i].draw(0, 0)
+        rules[i].draw(i, 0)
 
 
 # ID de reglas.
 
-r1 = Rule([1, 1], [0])
-draw_rules([r1])
-# r1.draw(1, 1)
+r1 = Rule([1, 1, 0], [1], 1)
+r2 = Rule([0, 0], [1, 1], 2)
+my_rules = [r1, r2]
+draw_rules(my_rules)
 
-l1 = Line(0)
-
+l1 = Line(0, None, False, generate_init_line(5))
+l2 = Line(1, my_rules)
 
 
 
